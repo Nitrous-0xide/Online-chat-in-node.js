@@ -1,64 +1,42 @@
-var express = require('express');
-var app = express();
-var path = require('path');
-var server = require('http').createServer(app);
-var io = require('socket.io')(server);
-var port = process.env.PORT || 3000;
+var io = require('socket.io-client');
+const chalk = require('chalk').constructor({ enabled: true, level: 3 });;
 
-server.listen(port, function() {
-	console.log('Server listening at port %d', port);
+var socket = io("https://chat-server--jajoosam.repl.co");
+
+const readline = require('readline');
+
+const rl = readline.createInterface({
+  input: process.stdin,
+  output: process.stdout
 });
 
-console.log('here');
-app.use(express.static(path.join(__dirname, 'public')));
 
-var numUsers = 0;
+var id = "";
+var buffer = "";
 
-io.on('connection', function(socket) {
-	var addedUser = false;
 
-	socket.on('new message', function(data) {
- 	socket.broadcast.emit('new message', {
-			username: socket.username,
-			message: data
-		});
+function chat(){
+	rl.question(chalk.magenta("» "), (answer) => {
+		buffer = `${chalk.cyan(id)} : ${chalk.bgCyan(answer)}`;
+		socket.emit("message", buffer);
+		chat();
+	});
+}
+
+socket.on('connect', () => {
+
+	rl.question(`What's your name? `, (answer) => {
+			socket.emit("message", `👤  : ${chalk.green(answer)} has joined the chat`);
+			id = answer;
+			chat();
+
 	});
 
-	socket.on('add user', function(username) {
-		if (addedUser) return;
-
-		socket.username = username;
-		++numUsers;
-		addedUser = true;
-		socket.emit('login', {
-			numUsers: numUsers
-		});
-		socket.broadcast.emit('user joined', {
-			username: socket.username,
-			numUsers: numUsers
-		});
-	});
-
-	socket.on('typing', function() {
-		socket.broadcast.emit('typing', {
-			username: socket.username
-		});
-	});
-
-	socket.on('stop typing', function() {
-		socket.broadcast.emit('stop typing', {
-			username: socket.username
-		});
-	});
-
-	socket.on('disconnect', function() {
-		if (addedUser) {
-			--numUsers;
-
-			socket.broadcast.emit('user left', {
-				username: socket.username,
-				numUsers: numUsers
-			});
+	socket.on('msg', function(data){
+		if(buffer!=data){
+			console.log("\n" + data);
+			chat();
 		}
 	});
-});     
+	
+})
